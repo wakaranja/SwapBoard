@@ -1,0 +1,196 @@
+<?php
+namespace App\Http\Controllers;
+
+use App\Swap;
+use App\User;
+use App\Success;
+use App\Comment;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use DB;
+use App\Http\Controllers\Controller;
+
+class SwapController extends Controller
+{
+    public function getSwaps()
+    {
+        $swaps=Swap::orderBy('created_at','desc')->paginate(10);
+		
+		
+        
+        $totalswaps=DB::table('swaps')->count();
+        
+        
+        return view('swaps',['swaps'=>$swaps,'totalswaps'=>$totalswaps]);
+        //return response($swaps);
+    }
+
+
+    public function SwapCreateSwap(Request $request)
+    {
+        $this->validate($request,[
+            'subject1'=>'required|max:30',
+            'subject2'=>'required|max:30',
+            'current_county'=>'required|max:50',
+            'current_subcounty'=>'required|max:50',
+            'current_school'=>'required|max:20',
+            'desired_county'=>'required|max:50',
+            'desired_subcounty'=>'required|max:50',
+            'phone_number'=>'required|max:10',
+
+
+        ]);
+
+        $swap=new Swap();
+
+        $swap->subject1=$request['subject1'];
+        $swap->subject2=$request['subject2'];
+        $swap->current_county=$request['current_county'];
+        $swap->current_subcounty=$request['current_subcounty'];
+        $swap->current_school=$request['current_school'];
+        $swap->desired_county=$request['desired_county'];
+        $swap->desired_subcounty=$request['desired_subcounty'];
+        $swap->phone_number=$request['phone_number'];
+
+        $message="There was an error while posting your swap!";
+
+        if($request->user()->swaps()->save($swap)){
+            $message="Swap successfully created!";
+        }
+        return redirect()->route('swaps')->with(['message'=>$message]);
+    }
+
+    public function getDeleteSwap($swap_id){
+        $swap=Swap::where('id',$swap_id)->first();
+        if(Auth::user()!=$swap->user){
+            return redirect()->back();
+        }
+        $swap->delete();
+        return redirect()->route('swaps')->with(['message'=>'Successfully Deleted!']);
+
+    }
+
+    public function swapEditSwap(request $request)
+    {
+        $this->validate($request, [
+            'subject1'=>'required',
+            'subject2'=>'required',
+            'current_county'=>'required',
+            'current_subcounty'=>'required',
+            'current_school'=>'required',
+            'desired_county'=>'required',
+            'desired_subcounty'=>'required',
+            'phone_number'=>'required',
+
+        ]);
+        $swap=Swap::find($request['swapId']);
+        if(Auth::user()!=$swap->user){
+            return redirect()->back();
+        }
+        $swap->subject1=$request['subject1'];
+        $swap->subject2=$request['subject2'];
+        $swap->current_county=$request['current_county'];
+        $swap->current_subcounty=$request['current_subcounty'];
+        $swap->current_school=$request['current_school'];
+        $swap->desired_county=$request['desired_county'];
+        $swap->desired_subcounty=$request['desired_subcounty'];
+        $swap->phone_number=$request['phone_number'];
+
+        $swap->update();
+        return response()->json(['new_subject1'=>$swap->subject1],200);
+    }
+
+    public function swapSearchSwap(request $request)
+    {
+        $this->validate($request, [
+            'subject1' => 'required',
+            'subject2' => 'required',
+            'current_county' => 'required',
+            'current_subcounty' => 'required',
+            'desired_county' => 'required',
+            'desired_subcounty' => 'required',
+        ]);
+
+        $subject1=$request['subject1'];
+        $subject2=$request['subject2'];
+        $current_county=$request['current_county'];
+        $current_subcounty=$request['current_subcounty'];
+        $desired_county=$request['desired_county'];
+        $desired_subcounty=$request['desired_subcounty'];
+        
+
+
+        $exactmatch=['subject1'=>$subject1,'subject2'=>$subject2,'current_county'=>$desired_county,'current_subcounty'=>$desired_subcounty,'desired_county'=>$current_county,'desired_subcounty'=>$current_subcounty];
+        $exactmatch2=['subject1'=>$subject2,'subject2'=>$subject1,'current_county'=>$desired_county,'current_subcounty'=>$desired_subcounty,'desired_county'=>$current_county,'desired_subcounty'=>$current_subcounty];
+        $combination=['subject1'=>$subject1,'subject2'=>$subject2,'current_county'=>$desired_county,'desired_county'=>$current_county];
+        $combination2=['subject1'=>$subject2,'subject2'=>$subject1,'current_county'=>$desired_county,'desired_county'=>$current_county];
+       
+	
+        $exactly1=DB::table('swaps')->where($exactmatch)->orwhere($exactmatch2)->get(); 
+        $swapresults1=DB::table('swaps')->where($combination)->orwhere($combination2)->get();
+        $exactly=Swap::where($exactmatch)->orwhere($exactmatch2)->get();
+	$swapresults=Swap::where($combination)->orwhere($combination2)->whereNotIn('id',$exactly)->get();
+        
+        
+       
+        return view('swapresults',['swapresults'=>$swapresults,'exactly'=>$exactly]);
+    }
+    
+    public function stats()
+    {
+        $swaps=Swap::orderBy('created_at','desc')->paginate(10);
+		
+	$allswaps=Swap::all();
+	$allusers=User::all();
+        
+        $totalswaps=$allswaps->count();
+	$totalusers=DB::table('users')->count();
+		
+	$maleteachers=DB::table('users')->where('gender','male')->count();
+	$femaleteachers=DB::table('users')->where('gender','female')->count();
+	
+	$allsuccessful=Success::all();
+	$allexactsuccessful=Success::where('exact',1)->get();
+	$allpartialsuccess=Success::where('exact',0)->get();
+		
+	$totalsuccessful=$allsuccessful->count();
+	$totalexact=$allexactsuccessful->count();
+	$totalpartial=$allpartialsuccess->count();
+		
+		
+	
+		
+        return view('stats',['allswaps'=>$allswaps,'totalswaps'=>$totalswaps,'totalusers'=>$totalusers,'maleteachers'=>$maleteachers,'femaleteachers'=>$femaleteachers,'totalsuccessful'=>$totalsuccessful,'totalexact'=>$totalexact,'totalpartial'=>$totalpartial]);
+        //return response($swaps);
+    }
+	
+	public function createComment(Request $request)
+	{
+		$this->validate($request,[
+            'body'=>'required|max:1000'
+        ]);
+		
+		$swap=Swap::find($request ['swap_id']);
+		
+        $comment=new Comment();
+        $comment->body=$request['body'];
+		$comment->user_id=$request->user()->id;
+		
+        $message='There was an error posting your comment';
+		
+        if($swap->comments()->save($comment)){
+            $message='Comment sucessfully created!';
+        };
+        return redirect()->route('swaps')->with(['message'=>$message]);
+	}
+	
+	public function deleteComment($comment_id){
+        $comment=Comment::where('id',$comment_id)->first();
+        if(Auth::user()!=$comment->user){
+            return redirect()->back();
+        }
+        $comment->delete();
+        return redirect()->route('dashboard')->with(['message'=>'Comment Successfully Deleted!']);
+
+    }
+}
