@@ -1,0 +1,64 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use App\Job;
+
+use App\Http\Requests;
+
+class JobController extends Controller
+{
+    //
+    
+    public function createJob(Request $request)
+    {
+
+        $this->validate($request,[
+            'subject1'=>'required|max:30',
+            'subject2'=>'required|max:30',
+            'terms'=>'required|max:50',
+            'county'=>'required|max:50',
+            'school'=>'required|max:50',
+            'contact'=>'required|digits:10|max:50',
+            'email'=>'required|email'
+
+        ]);
+
+
+        $job=new Job();
+        
+        $job->subject1=$request['subject1'];
+        $job->subject2=$request['subject2'];
+        $job->terms=$request['terms'];
+        $job->county=$request['county'];
+        $job->school=$request['school'];
+        $job->contact=$request['contact'];
+        $job->email=$request['email'];
+        $job->additional_info=$request['additional_info'];
+        $job->pay_range=$request['pay_range'];
+        
+        $message="There was a problem posting your job";
+        
+        if($request->user()->jobs()->save($job)) {
+            $message = "Job Successfully posted";
+        }
+        return redirect()->route('jobs')->with(['message'=>$message])->with(['request'=>$request]);
+        
+    }
+
+    public function getJobs()
+    {
+        $jobs=Job::orderBy('created_at','desc')->paginate(10);
+
+        return view('jobs',['jobs'=>$jobs]);
+    }
+
+    public function searchJobs(Request $request)
+    {
+        $searchquery=['subject1'=>$request['subject1'],'subject2'=>$request['subject2'],'county'=>$request['county']];
+        $jobs=Job::where($searchquery)->get();
+
+        return view('jobs',['jobs'=>$jobs]);
+    }
+}
